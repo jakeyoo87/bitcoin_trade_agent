@@ -108,7 +108,7 @@ def log_trade(
 
 
 # 최근 투자 기록 조회
-def get_recent_trades(conn, days=3):
+def get_recent_trades(conn, days=2):
     c = conn.cursor()
     days_ago = (datetime.now() - timedelta(days=days)).isoformat()
     c.execute(
@@ -326,8 +326,8 @@ def perform_chart_actions(driver):
     # 10분 옵션 선택
     click_element_by_xpath(
         driver,
-        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[5]",
-        "10분 옵션",
+        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[6]",
+        "30분 옵션",
     )
     # 지표 메뉴 클릭
     click_element_by_xpath(
@@ -393,9 +393,6 @@ def ai_trading(coin):
     # df_minute60 = dropna(df_minute60)
     # df_minute60 = add_indicators(df_minute60)
 
-    # 4. 공포 탐욕 지수 가져오기
-    fear_greed_index = get_fear_and_greed_index()
-
     # 6. YouTube 자막 데이터 가져오기
     # youtube_transcript = get_combined_transcript("3XbtEX3jUv4")
     f = open("strategy.txt", "r", encoding="utf-8")
@@ -437,9 +434,10 @@ def ai_trading(coin):
 
             # 현재 시장 데이터 수집 (기존 코드에서 가져온 데이터 사용)
             current_market_data = {
-                "fear_greed_index": fear_greed_index,
+                # "fear_greed_index": fear_greed_index,
                 # "news_headlines": news_headlines,
                 "orderbook": orderbook,
+                "recent_trades": recent_trades,
                 # "daily_ohlcv": df_minute60.to_dict(),
                 # "hourly_ohlcv": df_minute5.to_dict(),
             }
@@ -453,20 +451,20 @@ def ai_trading(coin):
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are an expert in Bitcoin investing. Analyze the provided data and determine whether to buy or sell at the current moment. 
+                        "content": f"""You are an expert in Bitcoin investing. Analyze the provided data and determine whether to buy or sell or hold at the current moment. 
                         Consider the following trade strategy in Korean: {youtube_transcript}
 
                         Based on this trading method, analyze the current market situation and make a judgment by synthesizing it with the provided data.
-                        When you decide the percentage for buy and sell, consider fear_greed_index and orderbook
-                        Your percentage should reflect the strength of your conviction in the decision based on the analyzed data.
+                        When you decide the percentage for buy and sell, the percentage should reflect the strength of your conviction in the decision based on the analyzed data.
 
                         Response format:
-                        1. Decision (buy, or sell)
-                        2. If the decision is 'buy', provide a percentage (1-20) of available KRW to use for buying.
-                           If the decision is 'sell', provide a percentage (1-20) of held BTC to sell.
+                        1. Decision (buy, hold, sell)
+                        2. If the decision is 'buy', provide a percentage (1-50) of available KRW to use for buying.
+                           If the decision is 'sell', provide a percentage (1-50) of held BTC to sell.
+                           If the decision is 'hold', percentae is 0 and no actions is to be taken 
                         3. Reason for your decision
 
-                        Ensure that the percentage is an integer between 1 and 20 for buy/sell decisions.
+                        Ensure that the percentage is an integer between 1 and 50 for buy/sell decisions.
                         """,
                     },
                     {
@@ -474,9 +472,11 @@ def ai_trading(coin):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"""Current investment status: {json.dumps(filtered_balances)}
-                Orderbook: {json.dumps(orderbook)}
-                Fear and Greed Index: {json.dumps(fear_greed_index)}""",
+                                "text": f"""
+                                Current investment status: {json.dumps(filtered_balances)}
+                                Orderbook: {json.dumps(orderbook)}
+                                Recent Trades: {json.dumps(recent_trades.to_json())}
+                                """,
                             },
                             {
                                 "type": "image_url",
@@ -497,7 +497,7 @@ def ai_trading(coin):
                             "properties": {
                                 "decision": {
                                     "type": "string",
-                                    "enum": ["buy", "sell"],
+                                    "enum": ["buy", "sell", "hold"],
                                 },
                                 "percentage": {"type": "integer"},
                                 "reason": {"type": "string"},
@@ -645,7 +645,7 @@ if __name__ == "__main__":
 
     ## 매일 특정 시간(예: 오전 9시, 오후 3시, 오후 9시)에 실행
     # schedule.every().day.at("03:00").do(job)
-    schedule.every().hour.do(job)
+    schedule.every(3).hours.do(job)
 
     while True:
         schedule.run_pending()
