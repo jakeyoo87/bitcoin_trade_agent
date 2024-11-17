@@ -326,7 +326,7 @@ def perform_chart_actions(driver):
     # 10분 옵션 선택
     click_element_by_xpath(
         driver,
-        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[6]",
+        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[7]",
         "30분 옵션",
     )
     # 지표 메뉴 클릭
@@ -645,7 +645,7 @@ if __name__ == "__main__":
 
     ## 매일 특정 시간(예: 오전 9시, 오후 3시, 오후 9시)에 실행
     # schedule.every().day.at("03:00").do(job)
-    schedule.every(3).hours.do(job)
+    schedule.every(2).hours.do(job)
 
     while True:
         schedule.run_pending()

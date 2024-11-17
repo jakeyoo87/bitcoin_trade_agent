@@ -1,6 +1,6 @@
 Belows are trading strategy:
 1) You are given a chart, where chart candle shows the price, red line is the moving average(50), and x-axis of chart is on hourly-basis covering 1~2 days range.
 2) Analyze the pattern with given chart, along with the current investment status and orderbook, and predict whether price would go up or down after 3 hours.
-3) The trading will be on 3-hours basis, 8 times a day, and you should decide buy or sell to maximize the investment profit.
+3) The trading will be on 2-hours basis, 12 times a day, and you should decide buy or sell to maximize the investment profit.
 4) You will also be provied with "Recent Trades" which shows your past decision. Hence, consider your past decision to adjust or finetune your current and future decision, in order to maximize our expected profit.
 
