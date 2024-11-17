@@ -108,7 +108,7 @@ def log_trade(
 
 
 # 최근 투자 기록 조회
-def get_recent_trades(conn, days=2):
+def get_recent_trades(conn, days=1):
     c = conn.cursor()
     days_ago = (datetime.now() - timedelta(days=days)).isoformat()
     c.execute(
@@ -326,8 +326,8 @@ def perform_chart_actions(driver):
     # 10분 옵션 선택
     click_element_by_xpath(
         driver,
-        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[7]",
-        "30분 옵션",
+        "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[4]",
+        "5분 옵션",
     )
     # 지표 메뉴 클릭
     click_element_by_xpath(
@@ -380,10 +380,23 @@ def ai_trading(coin):
     global upbit
     ### 데이터 가져오기
     # 1. 현재 투자 상태 조회
+    current_btc_price = pyupbit.get_current_price("KRW-BTC")
+    time.sleep(2)
     all_balances = upbit.get_balances()
-    filtered_balances = [
-        balance for balance in all_balances if balance["currency"] in ["BTC", "KRW"]
-    ]
+    filtered_balances = []
+    for balance in all_balances:
+        if balance["currency"] == "KRW":
+            filtered_balances.append({"money(KRW)": balance["balance"]})
+        elif balance["currency"] == "BTC":
+            filtered_balances.append(
+                {
+                    "BTC(Bought)": float(balance["balance"])
+                    * float(balance["avg_buy_price"])
+                }
+            )
+            filtered_balances.append(
+                {"BTC(Current)": float(balance["balance"]) * float(current_btc_price)}
+            )
 
     # 2. 오더북(호가 데이터) 조회
     orderbook = pyupbit.get_orderbook("KRW-BTC")
@@ -430,7 +443,7 @@ def ai_trading(coin):
         # 데이터베이스 연결
         with sqlite3.connect("bitcoin_trades.db") as conn:
             # 최근 거래 내역 가져오기
-            recent_trades = get_recent_trades(conn)
+            recent_trades = get_recent_trades(conn, days=1).head(12)
 
             # 현재 시장 데이터 수집 (기존 코드에서 가져온 데이터 사용)
             current_market_data = {
@@ -451,17 +464,17 @@ def ai_trading(coin):
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are an expert in Bitcoin investing. Analyze the provided data and determine whether to buy or sell or hold at the current moment. 
+                        "content": f"""You are an expert in Bitcoin(BTC) investing. Analyze the provided data and determine whether to buy or sell at the current moment. 
                         Consider the following trade strategy in Korean: {youtube_transcript}
 
                         Based on this trading method, analyze the current market situation and make a judgment by synthesizing it with the provided data.
                         When you decide the percentage for buy and sell, the percentage should reflect the strength of your conviction in the decision based on the analyzed data.
+                        If you are not confident, or you would like to hold the decision, the percentage should be lower (e.g., single digit).
 
                         Response format:
-                        1. Decision (buy, hold, sell)
+                        1. Decision (buy, sell)
                         2. If the decision is 'buy', provide a percentage (1-50) of available KRW to use for buying.
                            If the decision is 'sell', provide a percentage (1-50) of held BTC to sell.
-                           If the decision is 'hold', percentae is 0 and no actions is to be taken 
                         3. Reason for your decision
 
                         Ensure that the percentage is an integer between 1 and 50 for buy/sell decisions.
@@ -497,7 +510,7 @@ def ai_trading(coin):
                             "properties": {
                                 "decision": {
                                     "type": "string",
-                                    "enum": ["buy", "sell", "hold"],
+                                    "enum": ["buy", "sell"],
                                 },
                                 "percentage": {"type": "integer"},
                                 "reason": {"type": "string"},
@@ -606,7 +619,7 @@ def ai_trading(coin):
                 result.decision,
                 result.percentage if order_executed else 0,
                 result.reason,
-                btc_balance,
+                float(btc_balance) * float(current_btc_price),
                 krw_balance,
                 btc_avg_buy_price,
                 current_btc_price,
@@ -645,7 +658,7 @@ if __name__ == "__main__":
 
     ## 매일 특정 시간(예: 오전 9시, 오후 3시, 오후 9시)에 실행
     # schedule.every().day.at("03:00").do(job)
-    schedule.every(2).hours.do(job)
+    schedule.every(20).minutes.do(job)
 
     while True:
         schedule.run_pending()

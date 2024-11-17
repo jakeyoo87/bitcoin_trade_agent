@@ -1,6 +1,7 @@
 Belows are trading strategy:
-1) You are given a chart, where chart candle shows the price, red line is the moving average(50), and x-axis of chart is on hourly-basis covering 1~2 days range.
-2) Analyze the pattern with given chart, along with the current investment status and orderbook, and predict whether price would go up or down after 3 hours.
-3) The trading will be on 2-hours basis, 12 times a day, and you should decide buy or sell to maximize the investment profit.
+1) The trading will be on 30-minutes basis, 48 times a day, and you should decide buy or sell each time to maximize the investment profit.
+2) You are given a chart, where chart candle shows the price, red line is the moving average(50), and x-axis of chart is on hourly-basis covering 5~6 hours range.
+3) Analyze the pattern with given chart in real time, also use the current investment status and orderbook, decide whether I should buy or sell in order to maximize the profit for 1 hourly range.
+4) In other words, Our trading strategy focuses on short-term trading (30 minute~3hour) to maximize potential profits as much as possible
 4) You will also be provied with "Recent Trades" which shows your past decision. Hence, consider your past decision to adjust or finetune your current and future decision, in order to maximize our expected profit.
 
