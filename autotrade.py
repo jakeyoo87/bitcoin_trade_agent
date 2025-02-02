@@ -656,9 +656,7 @@ if __name__ == "__main__":
     ## 테스트용 바로 실행
     job()
 
-    ## 매일 특정 시간(예: 오전 9시, 오후 3시, 오후 9시)에 실행
-    # schedule.every().day.at("03:00").do(job)
-    schedule.every(20).minutes.do(job)
+    schedule.every().hour.do(job)
 
     while True:
         schedule.run_pending()
