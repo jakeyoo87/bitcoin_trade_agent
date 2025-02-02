@@ -7,6 +7,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+coin = "KRW-XRP"
+
 
 # ==============================
 # 1) DB 연결 및 DataFrame 로드
@@ -38,7 +40,7 @@ def calculate_initial_investment(df):
 def calculate_current_investment(df):
     current_krw_balance = df.iloc[-1]["krw_balance"]
     current_btc_balance = df.iloc[-1]["btc_balance"]
-    current_btc_price = pyupbit.get_current_price("KRW-BTC")  # 현재 BTC 가격 가져오기
+    current_btc_price = pyupbit.get_current_price(coin)  # 현재 BTC 가격 가져오기
     if current_btc_price is None:  # API 호출 실패 시 마지막 기록된 가격 사용
         current_btc_price = df.iloc[-1]["btc_krw_price"]
     current_total_investment = current_krw_balance + (
@@ -107,7 +109,7 @@ def main():
     st.header("BTC Price with Trading Points")
 
     # 시장 데이터 로드
-    market_df = pyupbit.get_ohlcv("KRW-BTC", interval="minute10", count=200)
+    market_df = pyupbit.get_ohlcv(coin, interval="minute10", count=200)
     if not market_df.empty:
         # 차트 생성
         fig = go.Figure()
