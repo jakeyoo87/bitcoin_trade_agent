@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # 데이터베이스 초기화
 def init_db():
-    conn = sqlite3.connect("crypto_trades.db")
+    conn = sqlite3.connect("bitcoin_trades.db")
     c = conn.cursor()
     c.execute(
         """CREATE TABLE IF NOT EXISTS trades
