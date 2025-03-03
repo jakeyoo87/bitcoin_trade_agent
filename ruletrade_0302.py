@@ -45,22 +45,21 @@ def init_db():
 
 # 매매 결정 함수
 def decision_logic(current_coin_price, df, avg_buy_price):
-    ema_5 = df["ema_5"].iloc[-1]
-    ema_20 = df["ema_20"].iloc[-1]
-    ema_60 = df["ema_60"].iloc[-1]
+    ema = df["ema"].iloc[-1]
+    ema_diff = df["ema_diff"].iloc[-1]
+    ema_diff_sma = df["ema_diff_sma"].iloc[-1]
 
     if avg_buy_price == 0:
-        if (
-            current_coin_price > ema_5
-            and current_coin_price > ema_20
-            and current_coin_price > ema_60
-        ):
+        if current_coin_price > ema and ema_diff > 3.5 and ema_diff_sma > 1.5:
             return (
                 "buy",
-                f"Coin_Price > EMA_5_20_60: {current_coin_price} > {ema_60}",
+                f"Coin_Price: {current_coin_price}, ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
             )
         else:
-            return "hold", f"Holding position - Coin_Price < EMA_5_20_60"
+            return (
+                "hold",
+                f"Holding position - ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+            )
     else:
         profit_loss_ratio = (
             (current_coin_price - avg_buy_price) / avg_buy_price * 100
@@ -68,26 +67,32 @@ def decision_logic(current_coin_price, df, avg_buy_price):
             else 0
         )
 
-        if profit_loss_ratio <= -0.3 or profit_loss_ratio >= 0.3:
-            return "sell", f"Profit/Loss Ratio Triggered: {profit_loss_ratio}%"
+        if profit_loss_ratio <= -1.0:
+            return "sell", f"Loss Ratio Triggered: {profit_loss_ratio}%"
+        elif ema_diff < -3.0 or ema_diff_sma < -1.0:
+            return (
+                "sell",
+                f"Loss triggered({profit_loss_ratio}%) - ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+            )
         else:
-            return "hold", f"Holding position - Profit/Loss Ratio: {profit_loss_ratio}%"
+            return (
+                "hold",
+                f"Profit/Loss Ratio: {profit_loss_ratio}%, ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+            )
 
 
 # 트레이딩 실행 함수
 def ai_trading(coin):
     current_price = pyupbit.get_current_price(coin)
-    df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=100)
+    df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=60)
     df_minute1 = dropna(df_minute1)
-    df_minute1["ema_5"] = ta.trend.EMAIndicator(
+    df_minute1["ema"] = ta.trend.EMAIndicator(
         close=df_minute1["close"], window=5
     ).ema_indicator()
-    df_minute1["ema_20"] = ta.trend.EMAIndicator(
-        close=df_minute1["close"], window=20
-    ).ema_indicator()
-    df_minute1["ema_60"] = ta.trend.EMAIndicator(
-        close=df_minute1["close"], window=60
-    ).ema_indicator()
+    df_minute1["ema_diff"] = df_minute1["ema"].diff()
+    df_minute1["ema_diff_sma"] = (
+        df_minute1["ema_diff"].rolling(window=3, min_periods=1).mean()
+    )
 
     with sqlite3.connect("bitcoin_trades.db") as conn:
         coin_avg_buy_price = upbit.get_avg_buy_price(coin[4:])
@@ -156,7 +161,7 @@ def log_trade(
         ),
     )
     conn.commit()
-    logger.info(f"Trade recorded in database: {decision} at {coin_krw_price} KRW")
+    # logger.debug(f"Trade recorded in database: {decision} at {coin_krw_price} KRW")
 
 
 if __name__ == "__main__":
