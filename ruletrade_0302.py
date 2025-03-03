@@ -26,17 +26,17 @@ logger = logging.getLogger(__name__)
 
 # 데이터베이스 초기화
 def init_db():
-    conn = sqlite3.connect("bitcoin_trades.db")
+    conn = sqlite3.connect("crypto_trades.db")
     c = conn.cursor()
     c.execute(
         """CREATE TABLE IF NOT EXISTS trades
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   timestamp TEXT,
                   decision TEXT,
-                  btc_balance REAL,
+                  coin_balance REAL,
                   krw_balance REAL,
-                  btc_avg_buy_price REAL,
-                  btc_krw_price REAL,
+                  coin_avg_buy_price REAL,
+                  coin_krw_price REAL,
                   reason TEXT)"""
     )
     conn.commit()
@@ -44,20 +44,29 @@ def init_db():
 
 
 # 매매 결정 함수
-def decision_logic(current_btc_price, df, avg_buy_price):
+def decision_logic(current_coin_price, df, avg_buy_price):
+    ema_5 = df["ema_5"].iloc[-1]
     ema_20 = df["ema_20"].iloc[-1]
-    profit_loss_ratio = (
-        (current_btc_price - avg_buy_price) / avg_buy_price * 100
-        if avg_buy_price > 0
-        else 0
-    )
 
-    if current_btc_price > ema_20:
-        return "buy", f"BTC_Price > EMA_20: {current_btc_price} > {ema_20}"
-    elif profit_loss_ratio <= -0.3 or profit_loss_ratio >= 0.3:
-        return "sell", f"Profit/Loss Ratio Triggered: {profit_loss_ratio}%"
+    if avg_buy_price == 0:
+        if current_coin_price > ema_5 and current_coin_price > ema_20:
+            return (
+                "buy",
+                f"Coin_Price > EMA_20, EMA_5: {current_coin_price} > {ema_20}, {ema_5}",
+            )
+        else:
+            return "hold", f"Holding position - Coin_Price < EMA_20"
     else:
-        return "hold", f"Holding position - Profit/Loss Ratio: {profit_loss_ratio}%"
+        profit_loss_ratio = (
+            (current_coin_price - avg_buy_price) / avg_buy_price * 100
+            if avg_buy_price > 0
+            else 0
+        )
+
+        if profit_loss_ratio <= -0.3 or profit_loss_ratio >= 0.3:
+            return "sell", f"Profit/Loss Ratio Triggered: {profit_loss_ratio}%"
+        else:
+            return "hold", f"Holding position - Profit/Loss Ratio: {profit_loss_ratio}%"
 
 
 # 트레이딩 실행 함수
@@ -65,13 +74,16 @@ def ai_trading(coin):
     current_price = pyupbit.get_current_price(coin)
     df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=60)
     df_minute1 = dropna(df_minute1)
+    df_minute1["ema_5"] = ta.trend.EMAIndicator(
+        close=df_minute1["close"], window=5
+    ).ema_indicator()
     df_minute1["ema_20"] = ta.trend.EMAIndicator(
         close=df_minute1["close"], window=20
     ).ema_indicator()
 
-    with sqlite3.connect("bitcoin_trades.db") as conn:
-        btc_avg_buy_price = upbit.get_avg_buy_price(coin[4:])
-        decision, reason = decision_logic(current_price, df_minute1, btc_avg_buy_price)
+    with sqlite3.connect("crypto_trades.db") as conn:
+        coin_avg_buy_price = upbit.get_avg_buy_price(coin[4:])
+        decision, reason = decision_logic(current_price, df_minute1, coin_avg_buy_price)
         order_executed = False
 
         if decision == "buy":
@@ -93,14 +105,14 @@ def ai_trading(coin):
                 )
 
         if order_executed:
-            btc_balance = upbit.get_balance(coin[4:])
+            coin_balance = upbit.get_balance(coin[4:])
             krw_balance = upbit.get_balance("KRW")
             log_trade(
                 conn,
                 decision,
-                btc_balance,
+                coin_balance,
                 krw_balance,
-                btc_avg_buy_price,
+                coin_avg_buy_price,
                 current_price,
                 reason,
             )
@@ -112,25 +124,31 @@ def ai_trading(coin):
 
 # 거래 기록 저장 함수
 def log_trade(
-    conn, decision, btc_balance, krw_balance, btc_avg_buy_price, btc_krw_price, reason
+    conn,
+    decision,
+    coin_balance,
+    krw_balance,
+    coin_avg_buy_price,
+    coin_krw_price,
+    reason,
 ):
     c = conn.cursor()
     timestamp = datetime.now().isoformat()
     c.execute(
-        """INSERT INTO trades (timestamp, decision, btc_balance, krw_balance, btc_avg_buy_price, btc_krw_price, reason)
+        """INSERT INTO trades (timestamp, decision, coin_balance, krw_balance, coin_avg_buy_price, coin_krw_price, reason)
             VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (
             timestamp,
             decision,
-            btc_balance,
+            coin_balance,
             krw_balance,
-            btc_avg_buy_price,
-            btc_krw_price,
+            coin_avg_buy_price,
+            coin_krw_price,
             reason,
         ),
     )
     conn.commit()
-    logger.info(f"Trade recorded in database: {decision} at {btc_krw_price} KRW")
+    logger.info(f"Trade recorded in database: {decision} at {coin_krw_price} KRW")
 
 
 if __name__ == "__main__":
