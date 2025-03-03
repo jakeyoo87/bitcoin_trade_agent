@@ -40,7 +40,7 @@ def calculate_initial_investment(df):
 def calculate_current_investment(df):
     current_krw_balance = df.iloc[-1]["krw_balance"]
     current_coin_balance = df.iloc[-1]["coin_balance"]
-    current_coin_price = pyupbit.get_current_price(coin)  # 현재 BTC 가격 가져오기
+    current_coin_price = pyupbit.get_current_price(coin)  # 현재 Coin 가격 가져오기
     if current_coin_price is None:  # API 호출 실패 시 마지막 기록된 가격 사용
         current_coin_price = df.iloc[-1]["coin_krw_price"]
     current_total_investment = current_krw_balance + (
@@ -105,8 +105,8 @@ def main():
     st.write(f"First trade date: {df['timestamp'].min()}")
     st.write(f"Last trade date: {df['timestamp'].max()}")
 
-    # BTC 가격 차트와 거래 시점
-    st.header("BTC Price with Trading Points")
+    # Coin 가격 차트와 거래 시점
+    st.header("Coin Price with Trading Points")
 
     # 시장 데이터 로드
     market_df = pyupbit.get_ohlcv(coin, interval="minute10", count=200)
@@ -114,13 +114,13 @@ def main():
         # 차트 생성
         fig = go.Figure()
 
-        # BTC 가격 라인
+        # Coin 가격 라인
         fig.add_trace(
             go.Scatter(
                 x=market_df.index,
                 y=market_df["close"],
                 mode="lines",
-                name="BTC Price",
+                name="Coin Price",
                 line=dict(color="gray", width=2),
                 hovertemplate="<b>Price</b>: ₩%{y:,.0f}<br>",
             )
@@ -135,7 +135,7 @@ def main():
             fig.add_trace(
                 go.Scatter(
                     x=buy_points["timestamp"],
-                    y=buy_points["btc_krw_price"],
+                    y=buy_points["coin_krw_price"],
                     mode="markers",
                     name="Buy",
                     marker=dict(color="green", size=10, symbol="triangle-up"),
@@ -152,7 +152,7 @@ def main():
             fig.add_trace(
                 go.Scatter(
                     x=sell_points["timestamp"],
-                    y=sell_points["btc_krw_price"],
+                    y=sell_points["coin_krw_price"],
                     mode="markers",
                     name="Sell",
                     marker=dict(color="red", size=10, symbol="triangle-down"),
@@ -169,7 +169,7 @@ def main():
             fig.add_trace(
                 go.Scatter(
                     x=hold_points["timestamp"],
-                    y=hold_points["btc_krw_price"],
+                    y=hold_points["coin_krw_price"],
                     mode="markers",
                     name="Hold",
                     marker=dict(color="yellow", size=8, symbol="circle"),
@@ -182,7 +182,7 @@ def main():
 
         # 차트 레이아웃 설정
         fig.update_layout(
-            title="Bitcoin Price with Trading Decisions",
+            title="Coin Price with Trading Decisions",
             xaxis_title="Date",
             yaxis_title="Price (KRW)",
             hovermode="x unified",
