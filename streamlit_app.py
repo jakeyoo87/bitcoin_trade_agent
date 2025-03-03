@@ -28,10 +28,10 @@ def load_data():
 # 초기 투자 금액 계산 함수
 def calculate_initial_investment(df):
     initial_krw_balance = df.iloc[0]["krw_balance"]
-    initial_btc_balance = df.iloc[0]["btc_balance"]
-    initial_btc_price = df.iloc[0]["btc_krw_price"]
+    initial_coin_balance = df.iloc[0]["coin_balance"]
+    initial_coin_price = df.iloc[0]["coin_krw_price"]
     initial_total_investment = initial_krw_balance + (
-        initial_btc_balance * initial_btc_price
+        initial_coin_balance * initial_coin_price
     )
     return initial_total_investment
 
@@ -39,12 +39,12 @@ def calculate_initial_investment(df):
 # 현재 투자 금액 계산 함수
 def calculate_current_investment(df):
     current_krw_balance = df.iloc[-1]["krw_balance"]
-    current_btc_balance = df.iloc[-1]["btc_balance"]
-    current_btc_price = pyupbit.get_current_price(coin)  # 현재 BTC 가격 가져오기
-    if current_btc_price is None:  # API 호출 실패 시 마지막 기록된 가격 사용
-        current_btc_price = df.iloc[-1]["btc_krw_price"]
+    current_coin_balance = df.iloc[-1]["coin_balance"]
+    current_coin_price = pyupbit.get_current_price(coin)  # 현재 BTC 가격 가져오기
+    if current_coin_price is None:  # API 호출 실패 시 마지막 기록된 가격 사용
+        current_coin_price = df.iloc[-1]["coin_krw_price"]
     current_total_investment = current_krw_balance + (
-        current_btc_balance * current_btc_price
+        current_coin_balance * current_coin_price
     )
     return current_total_investment
 
@@ -55,8 +55,8 @@ def calculate_market_return(df):
     first_trade = df[df["decision"].isin(["buy", "sell"])].iloc[0]
     last_trade = df.iloc[-1]
 
-    initial_price = first_trade["btc_krw_price"]
-    current_price = last_trade["btc_krw_price"]
+    initial_price = first_trade["coin_krw_price"]
+    current_price = last_trade["coin_krw_price"]
     market_return = ((current_price - initial_price) / initial_price) * 100
 
     # 첫 투자 시점도 반환
