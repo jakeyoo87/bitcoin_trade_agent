@@ -68,7 +68,7 @@ def decision_logic(current_coin_price, df, avg_buy_price):
             else 0
         )
 
-        if profit_loss_ratio <= -0.5 or profit_loss_ratio >= 0.5:
+        if profit_loss_ratio <= -0.3 or profit_loss_ratio >= 0.3:
             return "sell", f"Profit/Loss Ratio Triggered: {profit_loss_ratio}%"
         else:
             return "hold", f"Holding position - Profit/Loss Ratio: {profit_loss_ratio}%"
