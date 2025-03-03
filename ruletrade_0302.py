@@ -47,15 +47,20 @@ def init_db():
 def decision_logic(current_coin_price, df, avg_buy_price):
     ema_5 = df["ema_5"].iloc[-1]
     ema_20 = df["ema_20"].iloc[-1]
+    ema_60 = df["ema_60"].iloc[-1]
 
     if avg_buy_price == 0:
-        if current_coin_price > ema_5 and current_coin_price > ema_20:
+        if (
+            current_coin_price > ema_5
+            and current_coin_price > ema_20
+            and current_coin_price > ema_60
+        ):
             return (
                 "buy",
-                f"Coin_Price > EMA_20, EMA_5: {current_coin_price} > {ema_20}, {ema_5}",
+                f"Coin_Price > EMA_5_20_60: {current_coin_price} > {ema_60}",
             )
         else:
-            return "hold", f"Holding position - Coin_Price < EMA_20"
+            return "hold", f"Holding position - Coin_Price < EMA_5_20_60"
     else:
         profit_loss_ratio = (
             (current_coin_price - avg_buy_price) / avg_buy_price * 100
@@ -63,7 +68,7 @@ def decision_logic(current_coin_price, df, avg_buy_price):
             else 0
         )
 
-        if profit_loss_ratio <= -0.3 or profit_loss_ratio >= 0.3:
+        if profit_loss_ratio <= -0.5 or profit_loss_ratio >= 0.5:
             return "sell", f"Profit/Loss Ratio Triggered: {profit_loss_ratio}%"
         else:
             return "hold", f"Holding position - Profit/Loss Ratio: {profit_loss_ratio}%"
@@ -72,13 +77,16 @@ def decision_logic(current_coin_price, df, avg_buy_price):
 # 트레이딩 실행 함수
 def ai_trading(coin):
     current_price = pyupbit.get_current_price(coin)
-    df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=60)
+    df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=100)
     df_minute1 = dropna(df_minute1)
     df_minute1["ema_5"] = ta.trend.EMAIndicator(
         close=df_minute1["close"], window=5
     ).ema_indicator()
     df_minute1["ema_20"] = ta.trend.EMAIndicator(
         close=df_minute1["close"], window=20
+    ).ema_indicator()
+    df_minute1["ema_60"] = ta.trend.EMAIndicator(
+        close=df_minute1["close"], window=60
     ).ema_indicator()
 
     with sqlite3.connect("bitcoin_trades.db") as conn:
