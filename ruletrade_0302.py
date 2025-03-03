@@ -81,7 +81,7 @@ def ai_trading(coin):
         close=df_minute1["close"], window=20
     ).ema_indicator()
 
-    with sqlite3.connect("crypto_trades.db") as conn:
+    with sqlite3.connect("bitcoin_trades.db") as conn:
         coin_avg_buy_price = upbit.get_avg_buy_price(coin[4:])
         decision, reason = decision_logic(current_price, df_minute1, coin_avg_buy_price)
         order_executed = False
