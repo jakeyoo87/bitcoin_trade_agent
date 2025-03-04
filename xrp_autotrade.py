@@ -7,7 +7,9 @@ import schedule
 import logging
 from datetime import datetime
 import ta
-from ta.utils import dropna
+from collections import deque
+import numpy as np
+import pandas as pd  # EMA 계산을 위한 pandas 추가
 
 # .env 파일에서 API 키 로드
 load_dotenv()
@@ -22,6 +24,9 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# 가격 저장을 위한 deque (최대 100개 유지)
+price_queue = deque(maxlen=100)
 
 
 # 데이터베이스 초기화
@@ -43,60 +48,103 @@ def init_db():
     return conn
 
 
+# 이동 평균 계산 함수
+def calculate_moving_averages(min_n):
+    if len(price_queue) < min_n + 1:
+        logger.info("Waiting for enough data to calculate EMA and EMA Diff...")
+        return None, None, None  # 데이터가 부족하면 None 반환
+
+    prices = np.array(price_queue)
+
+    # prices에서 차이 벡터 계산
+    price_diff_series = pd.Series(prices).diff().dropna()
+
+    # EMA를 벡터 형태로 계산
+    ema_buy_series = ta.trend.EMAIndicator(
+        close=pd.Series(prices), window=int(min_n / 2)
+    ).ema_indicator()
+
+    # EMA를 벡터 형태로 계산
+    ema_sell_series = ta.trend.EMAIndicator(
+        close=pd.Series(prices), window=min_n
+    ).ema_indicator()
+
+    # EMA 차이를 벡터로 계산
+    ema_buy_series_diff = (
+        ema_buy_series.diff().dropna()
+    )  # 현재 EMA와 이전 EMA 값의 차이 (벡터)
+    ema_sell_series_diff = (
+        ema_sell_series.diff().dropna()
+    )  # 현재 EMA와 이전 EMA 값의 차이 (벡터)
+
+    return (
+        price_diff_series.iloc[-1],
+        ema_buy_series_diff.iloc[-1],
+        ema_sell_series_diff.iloc[-1],
+    )
+
+
 # 매매 결정 함수
-def decision_logic(current_coin_price, df, avg_buy_price):
-    ema = df["ema"].iloc[-1]
-    ema_diff = df["ema_diff"].iloc[-1]
-    ema_diff_sma = df["ema_diff_sma"].iloc[-1]
+def decision_logic(
+    current_coin_price, price_diff, ema_buy_diff, ema_sell_diff, avg_buy_price
+):
+    if price_diff is None:
+        return "hold", "Not enough data to make a decision."
 
     if avg_buy_price == 0:
-        if current_coin_price > ema and ema_diff > 3.5 and ema_diff_sma > 1.5:
+        if price_diff >= 8.0 and ema_buy_diff >= 4.0:
             return (
                 "buy",
-                f"Coin_Price: {current_coin_price}, ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+                f"Price: {current_coin_price}, Price Diff: {price_diff}, EMA Buy Diff: {ema_buy_diff}",
             )
         else:
             return (
                 "hold",
-                f"Holding position - ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+                f"Buy Holding - Price Diff: {price_diff}, EMA Buy Diff: {ema_buy_diff}",
             )
     else:
         profit_loss_ratio = (
-            (current_coin_price - avg_buy_price) / avg_buy_price * 100
+            ((current_coin_price - avg_buy_price) / avg_buy_price) * 100
             if avg_buy_price > 0
             else 0
         )
 
         if profit_loss_ratio <= -1.0:
             return "sell", f"Loss Ratio Triggered: {profit_loss_ratio}%"
-        elif ema_diff < -3.0 or ema_diff_sma < -1.0:
+        elif ema_sell_diff <= -0.0:
             return (
                 "sell",
-                f"Loss triggered({profit_loss_ratio}%) - ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+                f"Loss: {profit_loss_ratio}% - Price Diff: {price_diff}, EMA Sell Diff: {ema_sell_diff}",
             )
         else:
             return (
                 "hold",
-                f"Profit/Loss Ratio: {profit_loss_ratio}%, ema: {ema}, ema_diff: {ema_diff}, ema_diff_sma: {ema_diff_sma}",
+                f"Profit/Loss: {profit_loss_ratio}%, Price Diff: {price_diff}, EMA Sell Diff: {ema_sell_diff}",
             )
 
 
 # 트레이딩 실행 함수
 def ai_trading(coin):
+    global price_queue
+
     current_price = pyupbit.get_current_price(coin)
-    df_minute1 = pyupbit.get_ohlcv(coin, interval="minute1", count=60)
-    df_minute1 = dropna(df_minute1)
-    df_minute1["ema"] = ta.trend.EMAIndicator(
-        close=df_minute1["close"], window=5
-    ).ema_indicator()
-    df_minute1["ema_diff"] = df_minute1["ema"].diff()
-    df_minute1["ema_diff_sma"] = (
-        df_minute1["ema_diff"].rolling(window=3, min_periods=1).mean()
-    )
+    if current_price is None:
+        logger.warning("Failed to fetch current price.")
+        return
+
+    price_queue.append(current_price)  # 가격 리스트에 추가
+    price_diff, ema_buy_diff, ema_sell_diff = calculate_moving_averages(
+        min_n=6
+    )  # 이동 평균 계산
+
+    if price_diff is None:
+        return  # 데이터 부족으로 매매 중단
 
     with sqlite3.connect("bitcoin_trades.db") as conn:
         coin_avg_buy_price = upbit.get_avg_buy_price(coin[4:])
-        decision, reason = decision_logic(current_price, df_minute1, coin_avg_buy_price)
+        decision, reason = decision_logic(
+            current_price, price_diff, ema_buy_diff, ema_sell_diff, coin_avg_buy_price
+        )
         order_executed = False
 
         if decision == "buy":
@@ -105,7 +153,7 @@ def ai_trading(coin):
                 order = upbit.buy_market_order(coin, my_krw * 0.9995)
                 order_executed = bool(order)
                 logger.info(
-                    f"BUY order executed: {my_krw * 0.9995} KRW worth of {coin} - Reason: {reason}"
+                    f"BUY executed: {my_krw * 0.9995} KRW worth of {coin} - Reason: {reason}"
                 )
 
         elif decision == "sell":
@@ -114,7 +162,7 @@ def ai_trading(coin):
                 order = upbit.sell_market_order(coin, my_coin)
                 order_executed = bool(order)
                 logger.info(
-                    f"SELL order executed: {my_coin} {coin} at {current_price} KRW - Reason: {reason}"
+                    f"SELL executed: {my_coin} {coin} at {current_price} KRW - Reason: {reason}"
                 )
 
         if order_executed:
@@ -130,9 +178,7 @@ def ai_trading(coin):
                 reason,
             )
         else:
-            logger.info(
-                f"HOLD position - Current price: {current_price} KRW - Reason: {reason}"
-            )
+            logger.info(f"HOLD - Current Price: {current_price} KRW - Reason: {reason}")
 
 
 # 거래 기록 저장 함수
@@ -161,7 +207,6 @@ def log_trade(
         ),
     )
     conn.commit()
-    # logger.debug(f"Trade recorded in database: {decision} at {coin_krw_price} KRW")
 
 
 if __name__ == "__main__":
@@ -171,7 +216,7 @@ if __name__ == "__main__":
     def job():
         ai_trading(coin)
 
-    schedule.every(10).seconds.do(job)
+    schedule.every(3).seconds.do(job)
 
     while True:
         schedule.run_pending()
