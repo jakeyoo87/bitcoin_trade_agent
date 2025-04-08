@@ -100,7 +100,7 @@ def place_buy_order(coin, current_price, amount, discount_percent):
         logger.error(f"❌ {coin} 지정 매수 주문 중 오류 발생: {e}")
 
 
-# 📌 자동 매도 로직 (수익률 -1% 이하 or 3% 이상)
+# 📌 자동 매도 로직
 def auto_sell():
     logger.debug("\n🔍 현재 보유한 코인들의 수익률 확인 중...")
 
@@ -108,6 +108,7 @@ def auto_sell():
 
     for balance in balances:
         time.sleep(1)
+        sell_coin = None
         coin = balance["currency"]
         if coin == "KRW":
             continue  # 원화 패스
@@ -115,7 +116,7 @@ def auto_sell():
         amount = float(balance["balance"])
         avg_buy_price = float(balance["avg_buy_price"])
 
-        if amount <= 0:
+        if amount * avg_buy_price <= 5000:
             continue
 
         # 현재 시장 가격 가져오기
@@ -123,41 +124,34 @@ def auto_sell():
         current_price = pyupbit.get_current_price(market_code)
 
         if not current_price:
-            logger.warning(f"⚠️ {coin}의 현재 가격을 가져오지 못했습니다.")
+            logger.info(f"⚠️ {coin}의 현재 가격을 가져오지 못했습니다.")
             continue
 
         # 수익률 계산
         profit_percent = ((current_price - avg_buy_price) / avg_buy_price) * 100
 
         # 수익률 로그 출력
-        logger.debug(
+        logger.info(
             f"{coin} | 평균 매수가: {avg_buy_price} KRW | 현재가: {current_price} KRW | 수익률: {profit_percent:.2f}%"
         )
 
-        # 매도 조건 (-1% 이하 or 3% 이상)
-        if profit_percent <= -0.01:
-            reason = f"❌ 손실 제한 (-1% 이하) 초과: {profit_percent:.2f}%"
-            discount_percent = 2  # 손실 매도 후 2% 낮은 가격에 매수 주문
-        elif profit_percent >= 0.01:
-            reason = f"✅ 목표 수익 (3% 이상) 달성: {profit_percent:.2f}%"
-            discount_percent = 3  # 수익 매도 후 3% 낮은 가격에 매수 주문
+        if market_code == "KRW-BTC":
+            if profit_percent <= -2.5:
+                sell_coin = True
         else:
-            continue  # 📌 매도 조건이 아니면 패스
+            if profit_percent <= -0.5 or profit_percent >= 1.0:
+                sell_coin = True
 
         # 매도 실행
-        try:
-            logger.info(f"📉 {coin} 매도 진행 중... 이유: {reason}")
-            sell_order = upbit.sell_market_order(market_code, amount)
-
-            if sell_order:
-                logger.info(f"✅ {coin} 매도 성공: {sell_order}")
-                place_buy_order(
-                    coin, current_price, amount, discount_percent
-                )  # 📌 매도 후 지정 매수 실행
-            else:
-                logger.error(f"❌ {coin} 매도 실패")
-        except Exception as e:
-            logger.error(f"❌ {coin} 매도 중 오류 발생: {e}")
+        if sell_coin == True:
+            try:
+                sell_order = upbit.sell_market_order(market_code, amount)
+                if sell_order:
+                    logger.info(f"✅ {coin} 매도 성공: {sell_order}")
+                else:
+                    logger.info(f"❌ {coin} 매도 실패")
+            except Exception as e:
+                logger.info(f"❌ {coin} 매도 중 오류 발생: {e}")
 
 
 # 10초마다 자동 실행
