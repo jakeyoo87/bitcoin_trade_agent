@@ -19,10 +19,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def get_tick_size_from_orderbook(bid_prices):
+    """
+    주문장의 bid_price 리스트를 기반으로 호가 단위를 계산
+    """
+    # 호가 단위는 인접한 가격 차이 중 가장 작은 값으로 결정
+    tick_sizes = [
+        abs(bid_prices[i] - bid_prices[i + 1]) for i in range(len(bid_prices) - 1)
+    ]
+    return min(tick_sizes) if tick_sizes else 1
+
+
 def reformat_price_from_orderbook(market_code, target_price):
     """
     업비트 주문장에서 매수 가격을 확인하고,
-    - 주문장의 bid_price가 정수이면 target_price도 정수로 변환 (floor 사용)
+    - 주문장의 bid_price가 정수이면 target_price를 해당 호가 단위로 변환
     - 주문장의 bid_price가 소수이면 해당 소수점 자릿수에 맞춤
     """
     try:
@@ -38,9 +49,14 @@ def reformat_price_from_orderbook(market_code, target_price):
         # 가장 가까운 주문장 가격 찾기
         nearest_price = min(bid_prices, key=lambda x: abs(x - target_price))
 
+        # 주문장 기반으로 호가 단위 계산
+        tick_size = get_tick_size_from_orderbook(bid_prices)
+
         # 주문장의 가격 형태 확인 (정수인지 소수인지)
         if isinstance(nearest_price, int) or nearest_price.is_integer():
-            return math.floor(target_price)  # 정수 형태로 변환 (floor 사용)
+            return (
+                math.floor(target_price / tick_size) * tick_size
+            )  # 호가 단위에 맞춰 변환
         else:
             decimal_places = len(
                 str(nearest_price).split(".")[1]
@@ -119,10 +135,10 @@ def auto_sell():
         )
 
         # 매도 조건 (-1% 이하 or 3% 이상)
-        if profit_percent <= -1:
+        if profit_percent <= -0.01:
             reason = f"❌ 손실 제한 (-1% 이하) 초과: {profit_percent:.2f}%"
             discount_percent = 2  # 손실 매도 후 2% 낮은 가격에 매수 주문
-        elif profit_percent >= 3:
+        elif profit_percent >= 0.01:
             reason = f"✅ 목표 수익 (3% 이상) 달성: {profit_percent:.2f}%"
             discount_percent = 3  # 수익 매도 후 3% 낮은 가격에 매수 주문
         else:

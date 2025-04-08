@@ -9,3 +9,5 @@ youtube-transcript-api
 streamlit
 plotly
 schedule
+ccxt
+pandas
