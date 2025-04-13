@@ -1098,7 +1098,7 @@ IMPORTANT: Do not format your response as a code block. Do not include ```json, 
                 continue
 
         # ===== 14. 일정 시간 대기 후 다음 루프 실행 =====
-        time.sleep(60 * 10)  # 메인 루프는 10분마다 실행
+        time.sleep(60 * 30)  # 메인 루프는 30분마다 실행
 
     except Exception as e:
         print(f"\n Error: {e}")
