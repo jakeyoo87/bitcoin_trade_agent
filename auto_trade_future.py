@@ -560,47 +560,17 @@ def fetch_multi_timeframe_data():
 def fetch_bitcoin_news():
     """
     비트코인 관련 최신 뉴스를 가져옵니다
-
-    SERP API를 사용해 Google 뉴스에서 비트코인 관련 최신 뉴스 10개를 가져옵니다.
-
-    반환값:
-        list: 최신 뉴스 기사 정보 (제목과 날짜만 포함)
     """
     try:
-        # SERP API 요청 설정
-        url = "https://serpapi.com/search.json"
-        params = {
-            "engine": "google_news",  # Google 뉴스 검색
-            "q": "bitcoin",  # 검색어: 비트코인
-            "gl": "us",  # 국가: 미국
-            "hl": "en",  # 언어: 영어
-            "api_key": serp_api_key,  # API 키
-        }
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            tools=[{"type": "web_search_preview"}],
+            input="Summarize recent(i.e. within 12 hours) financial market related (e.g., bitcoin, nasdaq, fed rate, policy, gold, etc.) news in English."
+            " The summarization will be used for deciding whether we should buy or sell our bitcoin futures.",
+        )
 
-        # API 요청 보내기
-        response = requests.get(url, params=params)
+        return response.output_text
 
-        # 응답 확인 및 처리
-        if response.status_code == 200:
-            data = response.json()
-            news_results = data.get("news_results", [])
-
-            # 최신 뉴스 10개만 추출하고 제목과 날짜만 포함
-            recent_news = []
-            for i, news in enumerate(news_results[:10]):
-                news_item = {
-                    "title": news.get("title", ""),
-                    "date": news.get("date", ""),
-                }
-                recent_news.append(news_item)
-
-            print(
-                f"Collected {len(recent_news)} recent news articles (title and date only)"
-            )
-            return recent_news
-        else:
-            print(f"Error fetching news: Status code {response.status_code}")
-            return []
     except Exception as e:
         print(f"Error fetching news: {e}")
         return []
@@ -692,6 +662,8 @@ setup_database()
 
 # ===== 메인 트레이딩 루프 =====
 while True:
+    # ===== 0. 일정 시간 대기 후 다음 루프 실행 =====
+    time.sleep(60 * 60)  # 메인 루프는 10분마다 실행
     try:
         # 현재 시간 및 가격 조회
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -866,7 +838,6 @@ Follow this process:
    - Explain the rationale behind your trading direction, leverage, and SL/TP recommendations
    - Highlight key factors from your analysis that influenced your decision
    - Discuss how historical performance informed your current decision
-   - If applicable, explain how you're adapting based on recent trade outcomes
    - Mention specific patterns you've observed in successful vs unsuccessful trades
 
 Your response must contain ONLY a valid JSON object with exactly these 6 fields:
@@ -884,7 +855,7 @@ IMPORTANT: Do not format your response as a code block. Do not include ```json, 
 
             # OpenAI API 호출하여 트레이딩 결정 요청
             response = client.chat.completions.create(
-                model="gpt-4o",  # GPT-4o 모델 사용
+                model="o3-mini",  # gpt-4o, o3-mini
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": str(market_analysis)},
@@ -1127,9 +1098,6 @@ IMPORTANT: Do not format your response as a code block. Do not include ```json, 
                 print(f"기타 오류: {e}")
                 time.sleep(10)
                 continue
-
-        # ===== 14. 일정 시간 대기 후 다음 루프 실행 =====
-        time.sleep(60)  # 메인 루프는 1분마다 실행
 
     except Exception as e:
         print(f"\n Error: {e}")
