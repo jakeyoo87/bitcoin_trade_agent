@@ -15,7 +15,7 @@ secret = os.getenv("UPBIT_SECRET_KEY")
 upbit = pyupbit.Upbit(access, secret)
 
 # 로깅 설정
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
