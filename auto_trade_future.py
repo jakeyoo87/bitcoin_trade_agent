@@ -662,8 +662,6 @@ setup_database()
 
 # ===== 메인 트레이딩 루프 =====
 while True:
-    # ===== 0. 일정 시간 대기 후 다음 루프 실행 =====
-    time.sleep(60 * 60)  # 메인 루프는 10분마다 실행
     try:
         # 현재 시간 및 가격 조회
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -1098,6 +1096,9 @@ IMPORTANT: Do not format your response as a code block. Do not include ```json, 
                 print(f"기타 오류: {e}")
                 time.sleep(10)
                 continue
+
+        # ===== 14. 일정 시간 대기 후 다음 루프 실행 =====
+        time.sleep(60 * 10)  # 메인 루프는 10분마다 실행
 
     except Exception as e:
         print(f"\n Error: {e}")
