@@ -136,7 +136,7 @@ def get_pending_buy_prices(coin):
 
 # ✅ 자동 매도 및 재매수 로직 포함
 def auto_sell():
-    logger.debug("\n🔍 현재 보유한 코인들의 수익률 확인 중...")
+    logger.info("\n🔍 현재 보유한 코인들의 수익률 확인 중...")
     xrp_exist = False
     balances = upbit.get_balances()
     for balance in balances:
@@ -153,10 +153,12 @@ def auto_sell():
     if pending_prices:
         first_price = max(pending_prices)
         diff = ((current_price - first_price) / first_price) * 100
+        logger.info(f"🔁 {target_coin} 현재가 / 주문가: {diff}")
         if diff >= 1.0:
-            logger.debug(f"🔁 {target_coin} 현재가 변화 1% 이상 → 재주문 수행")
+            logger.info(f"🔁 {target_coin} 현재가 변화 1% 이상 → 재주문 수행")
             cancel_all_orders(target_coin)
-            discount_steps = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
+            time.sleep(1)
+            discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
             place_multiple_buy_orders(
                 target_coin,
                 current_price,
@@ -165,9 +167,9 @@ def auto_sell():
             )
     else:
         if xrp_exist == False:
-            logger.debug(f"🔁 {target_coin} 신규 주문 수행")
+            logger.info(f"🔁 {target_coin} 신규 주문 수행")
             cancel_all_orders(target_coin)
-            discount_steps = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
+            discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
             place_multiple_buy_orders(
                 target_coin,
                 current_price,
@@ -193,28 +195,28 @@ def auto_sell():
             continue
 
         profit_percent = ((current_price - avg_buy_price) / avg_buy_price) * 100
-        logger.debug(
+        logger.info(
             f"{coin} | 평균가: {avg_buy_price} | 현재가: {current_price} | 수익률: {profit_percent:.2f}%"
         )
 
         if market_code == "KRW-BTC":
-            if profit_percent <= -2.5:
+            if profit_percent <= -3.0:
                 try:
                     upbit.sell_market_order(market_code, amount)
-                    logger.debug(f"✅ {coin} BTC 매도 완료")
+                    logger.info(f"✅ {coin} BTC 매도 완료")
                 except Exception as e:
                     logger.error(f"❌ BTC 매도 오류: {e}")
         elif market_code == "KRW-XRP":
-            if profit_percent <= -0.1 or profit_percent >= 0.1:
+            if profit_percent <= -1.0 or profit_percent >= 0.5:
                 try:
                     # 매도
                     upbit.sell_market_order(market_code, amount)
-                    logger.debug(f"✅ {coin} 매도 완료")
+                    logger.info(f"✅ {coin} 매도 완료")
                     time.sleep(3)
 
                     # 기존 주문 취소 및 매수 주문
                     cancel_all_orders(market_code)
-                    discount_steps = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
+                    discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
                     current_price = pyupbit.get_current_price(market_code)
                     place_multiple_buy_orders(
                         coin, current_price, int(krw_balance / 2), discount_steps
@@ -224,7 +226,7 @@ def auto_sell():
 
 
 # ✅ 주기적 실행 설정
-schedule.every(6).seconds.do(auto_sell)
+schedule.every(10).seconds.do(auto_sell)
 logger.info("🚀 자동 매도 시스템 시작...")
 
 while True:
