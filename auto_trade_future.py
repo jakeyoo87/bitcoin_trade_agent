@@ -794,7 +794,7 @@ Follow this process:
    - Long-term trend (4h): Overall market bias
    - Volatility across timeframes
    - Key support/resistance levels
-   - News sentiment: Analyze recent news article titles for bullish or bearish sentiment
+   - News sentiment: If provided, analyze recent bullish or bearish sentiment
 
 3. Based on your analysis, determine:
    - Direction: Whether to go LONG or SHORT
@@ -820,8 +820,6 @@ Follow this process:
 6. Set optimal Stop Loss (SL) and Take Profit (TP) levels:
    - Analyze recent price action, support/resistance levels
    - Consider volatility to prevent premature stop-outs
-   - Set SL at a technical level that would invalidate your trade thesis
-   - Set TP at a realistic target based on technical analysis
    - Both levels should be expressed as percentages from entry price
    - Adapt based on historical SL/TP performance and premature stop-outs
    - Learn from trades that hit SL vs TP and adjust accordingly
