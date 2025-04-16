@@ -4,6 +4,13 @@ import time
 import schedule
 import logging
 import math
+import jwt
+import hashlib
+import os
+import requests
+import uuid
+import logging
+from urllib.parse import urlencode, unquote
 from dotenv import load_dotenv
 
 # .env 파일에서 API 키 로드
@@ -102,13 +109,48 @@ def place_buy_order(coin, current_price, amount, discount_percent):
 
 # ✅ 기존 주문 전체 취소
 def cancel_all_orders(coin):
+    server_url = os.environ.get("UPBIT_OPEN_API_SERVER_URL", "https://api.upbit.com")
     try:
         market_code = f"KRW-{coin}"
-        orders = upbit.get_order(market_code)
-        for order in orders:
-            upbit.cancel_order(order["uuid"])
-            time.sleep(1)
-        logger.debug(f"🧹 {coin} 기존 미체결 주문 모두 취소 완료")
+
+        # 일괄취소 API 요청 파라미터
+        params = {
+            "pairs": market_code,
+            "cancel_side": "all",
+            "count": 100,
+            "order_by": "desc",
+        }
+
+        # 쿼리 문자열 생성 및 해시
+        query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
+        m = hashlib.sha512()
+        m.update(query_string)
+        query_hash = m.hexdigest()
+
+        # JWT 페이로드 구성
+        payload = {
+            "access_key": access,
+            "nonce": str(uuid.uuid4()),
+            "query_hash": query_hash,
+            "query_hash_alg": "SHA512",
+        }
+
+        jwt_token = jwt.encode(payload, secret, algorithm="HS256")
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+        }
+
+        # DELETE 요청 실행
+        res = requests.delete(
+            f"{server_url}/v1/orders/open", params=params, headers=headers
+        )
+
+        # 결과 출력
+        if res.status_code == 200:
+            logger.debug(f"🧹 {coin} 기존 미체결 주문 일괄 취소 완료")
+        else:
+            logger.error(f"❌ {coin} 주문 취소 실패: {res.status_code} {res.text}")
+
     except Exception as e:
         logger.error(f"❌ {coin} 주문 취소 오류: {e}")
 
@@ -150,32 +192,16 @@ def auto_sell():
     pending_prices = get_pending_buy_prices(target_coin)
     current_price = pyupbit.get_current_price(f"KRW-{target_coin}")
 
-    if pending_prices:
-        first_price = max(pending_prices)
-        diff = ((current_price - first_price) / first_price) * 100
-        logger.info(f"🔁 {target_coin} 현재가 / 주문가: {diff}")
-        if diff >= 1.0:
-            logger.info(f"🔁 {target_coin} 현재가 변화 1% 이상 → 재주문 수행")
-            cancel_all_orders(target_coin)
-            time.sleep(1)
-            discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
-            place_multiple_buy_orders(
-                target_coin,
-                current_price,
-                int(krw_balance / 2),
-                discount_steps,
-            )
-    else:
-        if xrp_exist == False:
-            logger.info(f"🔁 {target_coin} 신규 주문 수행")
-            cancel_all_orders(target_coin)
-            discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
-            place_multiple_buy_orders(
-                target_coin,
-                current_price,
-                int(krw_balance / 2),
-                discount_steps,
-            )
+    if xrp_exist == False and pending_prices == []:
+        logger.info(f"🔁 {target_coin} 신규 주문 수행")
+        discount_steps = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+        place_multiple_buy_orders(
+            target_coin,
+            current_price,
+            int(krw_balance / 2),
+            discount_steps,
+        )
+        return
 
     for balance in balances:
         time.sleep(1)
@@ -200,27 +226,22 @@ def auto_sell():
         )
 
         if market_code == "KRW-BTC":
-            if profit_percent <= -3.0:
+            if profit_percent >= 3.0:
                 try:
                     upbit.sell_market_order(market_code, amount)
                     logger.info(f"✅ {coin} BTC 매도 완료")
                 except Exception as e:
                     logger.error(f"❌ BTC 매도 오류: {e}")
         elif market_code == "KRW-XRP":
-            if profit_percent <= -1.0 or profit_percent >= 0.5:
+            if profit_percent >= 0.5:
                 try:
                     # 매도
                     upbit.sell_market_order(market_code, amount)
                     logger.info(f"✅ {coin} 매도 완료")
                     time.sleep(3)
 
-                    # 기존 주문 취소 및 매수 주문
-                    cancel_all_orders(market_code)
-                    discount_steps = [0.3, 0.6, 0.9, 1.2, 1.5, 1.8]
-                    current_price = pyupbit.get_current_price(market_code)
-                    place_multiple_buy_orders(
-                        coin, current_price, int(krw_balance / 2), discount_steps
-                    )
+                    # 기존 주문 취소
+                    cancel_all_orders(coin)
                 except Exception as e:
                     logger.error(f"❌ {coin} 매도 및 재매수 오류: {e}")
 
