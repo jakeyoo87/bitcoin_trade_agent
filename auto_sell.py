@@ -194,11 +194,11 @@ def auto_sell():
 
     if xrp_exist == False and pending_prices == []:
         logger.info(f"🔁 {target_coin} 신규 주문 수행")
-        discount_steps = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+        discount_steps = [0.2, 0.5, 0.9, 1.4, 2.0]
         place_multiple_buy_orders(
             target_coin,
             current_price,
-            int(krw_balance / 2),
+            int(krw_balance / 3),
             discount_steps,
         )
         return
@@ -226,7 +226,7 @@ def auto_sell():
         )
 
         if market_code == "KRW-BTC":
-            if profit_percent >= 3.0:
+            if profit_percent >= 1.0:
                 try:
                     upbit.sell_market_order(market_code, amount)
                     logger.info(f"✅ {coin} BTC 매도 완료")
